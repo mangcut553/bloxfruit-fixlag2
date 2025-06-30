@@ -1,0 +1,74 @@
+local a = game; local b = a:GetService("Lighting")
+for _,c in pairs(workspace:GetDescendants()) do
+    if c:IsA("Decal") or c:IsA("Texture") then
+        c:Destroy()
+    elseif c:IsA("BasePart") then
+        c.Material = Enum.Material.SmoothPlastic
+        c.Reflectance = 0
+    elseif c:IsA("ParticleEmitter") or c:IsA("Trail") or c:IsA("Smoke") or c:IsA("Fire") then
+        c:Destroy()
+    end
+end
+
+b.GlobalShadows = false
+b.FogEnd = 1e10
+b.Brightness = 0
+
+for _,d in pairs(b:GetChildren()) do
+    if d:IsA("BlurEffect") or d:IsA("SunRaysEffect") or d:IsA("ColorCorrectionEffect") or d:IsA("BloomEffect") then
+        d:Destroy()
+    end
+end
+
+pcall(function()
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end)
+
+for _,e in pairs(workspace:GetChildren()) do
+    local n = e.Name:lower()
+    if n:find("tree") or n:find("bush") or n:find("grass") or n:find("detail") then
+        e:Destroy()
+    end
+end
+
+-- 🖼️ Hiện chữ "Mangcutyeuiem" màu hồng
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.ResetOnSpawn = false
+
+local textLabel = Instance.new("TextLabel", gui)
+textLabel.Text = "❤️ Mangcutyeuiem ❤️"
+textLabel.Size = UDim2.new(0, 400, 0, 50)
+textLabel.Position = UDim2.new(0.5, -200, 0.05, 0)
+textLabel.TextColor3 = Color3.fromRGB(255, 105, 180) -- 🌸 Hồng
+textLabel.BackgroundTransparency = 1
+textLabel.TextScaled = true
+textLabel.Font = Enum.Font.GothamBold
+
+-- 🎯 FPS Counter màu xanh dương
+local fpsLabel = Instance.new("TextLabel", gui)
+fpsLabel.Size = UDim2.new(0, 150, 0, 30)
+fpsLabel.Position = UDim2.new(1, -160, 0, 10)
+fpsLabel.BackgroundTransparency = 0.4
+fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+fpsLabel.TextColor3 = Color3.fromRGB(0, 170, 255) -- 🌊 Xanh dương
+fpsLabel.TextScaled = true
+fpsLabel.Font = Enum.Font.Code
+fpsLabel.Text = "FPS: 0"
+
+-- 🔁 Cập nhật FPS mỗi 0.25 giây
+local RunService = game:GetService("RunService")
+local frameCount = 0
+local lastTime = tick()
+
+RunService.RenderStepped:Connect(function()
+    frameCount += 1
+    local currentTime = tick()
+    if currentTime - lastTime >= 0.25 then
+        local fps = math.floor(frameCount / (currentTime - lastTime))
+        fpsLabel.Text = "FPS: " .. tostring(fps)
+        frameCount = 0
+        lastTime = currentTime
+    end
+end)
+
+print("✅ Script đã bật - Tối ưu map + chữ màu hồng + FPS xanh dương")
