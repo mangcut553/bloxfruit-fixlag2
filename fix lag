@@ -1,74 +1,199 @@
-local a = game; local b = a:GetService("Lighting")
-for _,c in pairs(workspace:GetDescendants()) do
-    if c:IsA("Decal") or c:IsA("Texture") then
-        c:Destroy()
-    elseif c:IsA("BasePart") then
-        c.Material = Enum.Material.SmoothPlastic
-        c.Reflectance = 0
-    elseif c:IsA("ParticleEmitter") or c:IsA("Trail") or c:IsA("Smoke") or c:IsA("Fire") then
-        c:Destroy()
-    end
-end
+-- AutoPerformance.client.lua
+-- Tự bật No-3D và Boost FPS khi vào game
+-- Có thể tắt/bật lại bằng phím hoặc nút UI
 
-b.GlobalShadows = false
-b.FogEnd = 1e10
-b.Brightness = 0
-
-for _,d in pairs(b:GetChildren()) do
-    if d:IsA("BlurEffect") or d:IsA("SunRaysEffect") or d:IsA("ColorCorrectionEffect") or d:IsA("BloomEffect") then
-        d:Destroy()
-    end
-end
-
-pcall(function()
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-end)
-
-for _,e in pairs(workspace:GetChildren()) do
-    local n = e.Name:lower()
-    if n:find("tree") or n:find("bush") or n:find("grass") or n:find("detail") then
-        e:Destroy()
-    end
-end
-
--- 🖼️ Hiện chữ "Mangcutyeuiem" màu hồng
-local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.ResetOnSpawn = false
-
-local textLabel = Instance.new("TextLabel", gui)
-textLabel.Text = "❤️ Mangcutyeuiem ❤️"
-textLabel.Size = UDim2.new(0, 400, 0, 50)
-textLabel.Position = UDim2.new(0.5, -200, 0.05, 0)
-textLabel.TextColor3 = Color3.fromRGB(255, 105, 180) -- 🌸 Hồng
-textLabel.BackgroundTransparency = 1
-textLabel.TextScaled = true
-textLabel.Font = Enum.Font.GothamBold
-
--- 🎯 FPS Counter màu xanh dương
-local fpsLabel = Instance.new("TextLabel", gui)
-fpsLabel.Size = UDim2.new(0, 150, 0, 30)
-fpsLabel.Position = UDim2.new(1, -160, 0, 10)
-fpsLabel.BackgroundTransparency = 0.4
-fpsLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-fpsLabel.TextColor3 = Color3.fromRGB(0, 170, 255) -- 🌊 Xanh dương
-fpsLabel.TextScaled = true
-fpsLabel.Font = Enum.Font.Code
-fpsLabel.Text = "FPS: 0"
-
--- 🔁 Cập nhật FPS mỗi 0.25 giây
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local frameCount = 0
-local lastTime = tick()
+local UIS = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
 
-RunService.RenderStepped:Connect(function()
-    frameCount += 1
-    local currentTime = tick()
-    if currentTime - lastTime >= 0.25 then
-        local fps = math.floor(frameCount / (currentTime - lastTime))
-        fpsLabel.Text = "FPS: " .. tostring(fps)
-        frameCount = 0
-        lastTime = currentTime
-    end
+local LP = Players.LocalPlayer
+local PG = LP:WaitForChild("PlayerGui")
+
+-- ===================== UI nhỏ =====================
+local gui = Instance.new("ScreenGui")
+gui.Name = "PerfTools"
+gui.ResetOnSpawn = false
+gui.Parent = PG
+
+local function makeBtn(text, x)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.fromOffset(150, 40)
+	b.Position = UDim2.fromOffset(12 + (x * 160), 12)
+	b.BackgroundTransparency = 0.2
+	b.AutoButtonColor = true
+	b.TextScaled = true
+	b.Font = Enum.Font.GothamMedium
+	b.Text = text
+	b.Parent = gui
+	return b
+end
+
+local btnNo3D = makeBtn("No-3D: ON", 0)
+local btnBoost = makeBtn("Boost: ON", 1)
+
+-- ===================== No-3D =====================
+local no3D = true
+local function applyNo3D()
+	RunService:Set3dRenderingEnabled(not no3D)
+	btnNo3D.Text = "No-3D: " .. (no3D and "ON" or "OFF")
+end
+
+btnNo3D.MouseButton1Click:Connect(function()
+	no3D = not no3D
+	applyNo3D()
 end)
 
-print("✅ Script đã bật - Tối ưu map + chữ màu hồng + FPS xanh dương")
+UIS.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.F10 then
+		no3D = not no3D
+		applyNo3D()
+	end
+end)
+
+Players.LocalPlayer.CharacterAdded:Connect(function()
+	if no3D then
+		RunService:Set3dRenderingEnabled(false)
+	end
+end)
+
+-- ===================== Boost FPS =====================
+local boostOn = true
+local restore = {
+	lighting = {},
+	terrain = {},
+	byInst = {},
+	conns = {}
+}
+
+local function remember(inst, prop, val)
+	local t = restore.byInst[inst]
+	if not t then t = {}; restore.byInst[inst] = t end
+	if t[prop] == nil then
+		t[prop] = val
+	end
+end
+
+local function applyTo(inst)
+	if inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam") or
+	   inst:IsA("Smoke") or inst:IsA("Fire") or inst:IsA("Sparkles") then
+		remember(inst, "Enabled", inst.Enabled)
+		inst.Enabled = false
+	elseif inst:IsA("PointLight") or inst:IsA("SpotLight") or inst:IsA("SurfaceLight") then
+		remember(inst, "Enabled", inst.Enabled)
+		inst.Enabled = false
+	elseif inst:IsA("BasePart") then
+		remember(inst, "CastShadow", inst.CastShadow)
+		inst.CastShadow = false
+		if inst:IsA("MeshPart") then
+			remember(inst, "RenderFidelity", inst.RenderFidelity)
+			inst.RenderFidelity = Enum.RenderFidelity.Performance
+		end
+	elseif inst:IsA("PostEffect") then
+		remember(inst, "Enabled", inst.Enabled)
+		inst.Enabled = false
+	end
+end
+
+local function boostOnApply()
+	restore.lighting.GlobalShadows = Lighting.GlobalShadows
+	restore.lighting.ShadowSoftness = Lighting.ShadowSoftness
+	restore.lighting.EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale
+	restore.lighting.EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale
+
+	Lighting.GlobalShadows = false
+	Lighting.ShadowSoftness = 0
+	Lighting.EnvironmentDiffuseScale = 0
+	Lighting.EnvironmentSpecularScale = 0
+
+	local atmo = Lighting:FindFirstChildOfClass("Atmosphere")
+	if atmo then
+		remember(atmo, "Density", atmo.Density)
+		remember(atmo, "Glare", atmo.Glare)
+		remember(atmo, "Haze", atmo.Haze)
+		atmo.Density = 0
+		atmo.Glare = 0
+		atmo.Haze = 0
+	end
+
+	local terrain = Workspace:FindFirstChildOfClass("Terrain")
+	if terrain then
+		restore.terrain.Decoration = terrain.Decoration
+		restore.terrain.WaterWaveSize = terrain.WaterWaveSize
+		restore.terrain.WaterWaveSpeed = terrain.WaterWaveSpeed
+		restore.terrain.WaterReflectance = terrain.WaterReflectance
+
+		terrain.Decoration = false
+		terrain.WaterWaveSize = 0
+		terrain.WaterWaveSpeed = 0
+		terrain.WaterReflectance = 0
+	end
+
+	for _, d in ipairs(workspace:GetDescendants()) do
+		applyTo(d)
+	end
+	for _, d in ipairs(Lighting:GetDescendants()) do
+		applyTo(d)
+	end
+
+	restore.conns.descAdded = workspace.DescendantAdded:Connect(function(d)
+		if boostOn then applyTo(d) end
+	end)
+	restore.conns.lightAdded = Lighting.DescendantAdded:Connect(function(d)
+		if boostOn then applyTo(d) end
+	end)
+end
+
+local function boostOffRestore()
+	for k, v in pairs(restore.lighting) do
+		pcall(function() Lighting[k] = v end)
+	end
+	restore.lighting = {}
+
+	local terrain = Workspace:FindFirstChildOfClass("Terrain")
+	if terrain then
+		for k, v in pairs(restore.terrain) do
+			pcall(function() terrain[k] = v end)
+		end
+	end
+	restore.terrain = {}
+
+	for inst, props in pairs(restore.byInst) do
+		if inst and inst.Parent then
+			for k, v in pairs(props) do
+				pcall(function() inst[k] = v end)
+			end
+		end
+	end
+	restore.byInst = {}
+
+	for _, c in pairs(restore.conns) do
+		if c then c:Disconnect() end
+	end
+	restore.conns = {}
+end
+
+local function toggleBoost()
+	boostOn = not boostOn
+	if boostOn then
+		boostOnApply()
+	else
+		boostOffRestore()
+	end
+	btnBoost.Text = "Boost: " .. (boostOn and "ON" or "OFF")
+end
+
+btnBoost.MouseButton1Click:Connect(toggleBoost)
+
+UIS.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.F9 then
+		toggleBoost()
+	end
+end)
+
+-- ===================== Auto-enable on startup =====================
+applyNo3D()
+boostOnApply()
